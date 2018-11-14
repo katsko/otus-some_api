@@ -209,8 +209,7 @@ class ClientsInterestsRequest(BaseMethodRequest):
     def result(self):
         interests = {client_id: get_interests(self.store, client_id)
                      for client_id in self.client_ids}
-        return self.error or interests, self.code, {
-            'nclients': len(self.client_ids)}
+        return interests, self.code, {'nclients': len(self.client_ids)}
 
 
 @api
@@ -239,7 +238,7 @@ class OnlineScoreRequest(BaseMethodRequest):
                 self.first_name, self.last_name)
         has_fields = [field for field in self._fields
                       if getattr(self, field) is not None]
-        return self.error or {'score': score}, self.code, {'has': has_fields}
+        return {'score': score}, self.code, {'has': has_fields}
 
 
 class MethodRequest(BaseMethodRequest):
@@ -261,8 +260,11 @@ class MethodRequest(BaseMethodRequest):
             return self.error or self.response, self.code, {}
         if self.code is not OK:
             return self.error, self.code, {}
-        return api_map[self.method](
-            self.arguments, self.store, is_admin=self.is_admin).result
+        api_response = api_map[self.method](
+            self.arguments, self.store, is_admin=self.is_admin)
+        if api_response.code is not OK:
+            return api_response.error, api_response.code, {}
+        return api_response.result
 
 
 def check_auth(request):
