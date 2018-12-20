@@ -141,8 +141,8 @@ class BirthDayField(DateField):
 class GenderField(Field):
 
     def _validate(self):
-        if self.value not in (1, 2, 3):
-            raise ValueError('Expected value 1, 2 or 3')
+        if self.value not in (0, 1, 2):
+            raise ValueError('Expected value 0, 1 or 2')
 
 
 class ClientIDsField(Field):
@@ -151,6 +151,8 @@ class ClientIDsField(Field):
         if not (isinstance(self.value, list) and
                 all(isinstance(item, int) for item in self.value)):
             raise ValueError('Expected list of int')
+        if not len(self.value):
+            raise ValueError('Expected not empty list')
 
 
 class MethodNameField(CharField):
@@ -174,10 +176,11 @@ class MetaBaseMethodRequest(type):
 class BaseMethodRequest(object):
     __metaclass__ = MetaBaseMethodRequest
 
-    def __init__(self, data, store, **kwargs):
+    def __init__(self, data, ctx, store, **kwargs):
         self.response = None
         self.error = None
         self.code = OK
+        self.ctx = ctx
         self.store = store
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -209,7 +212,8 @@ class ClientsInterestsRequest(BaseMethodRequest):
     def result(self):
         interests = {client_id: get_interests(self.store, client_id)
                      for client_id in self.client_ids}
-        return interests, self.code, {'nclients': len(self.client_ids)}
+        self.ctx.update(nclients=len(self.client_ids))
+        return interests, self.code
 
 
 @api
@@ -223,8 +227,8 @@ class OnlineScoreRequest(BaseMethodRequest):
 
     def validate(self):
         if not ((self.first_name and self.last_name) or
-                (self.email and self.phone) or
-                (self.birthday and self.gender)):
+                (self.email and self.phone is not None) or
+                (self.birthday and self.gender is not None)):
             raise ValueError('arguments: Required fistname-lastname or '
                              'email-phone or birthday-gender')
 
@@ -238,7 +242,8 @@ class OnlineScoreRequest(BaseMethodRequest):
                 self.first_name, self.last_name)
         has_fields = [field for field in self._fields
                       if getattr(self, field) is not None]
-        return {'score': score}, self.code, {'has': has_fields}
+        self.ctx.update(has=has_fields)
+        return {'score': score}, self.code
 
 
 class MethodRequest(BaseMethodRequest):
@@ -254,20 +259,23 @@ class MethodRequest(BaseMethodRequest):
 
     @property
     def result(self):
+        if self.code is not OK:
+            return self.error, self.code
         if not check_auth(self):
             self.code = FORBIDDEN
             logging.error(self.error)
-            return self.error or self.response, self.code, {}
-        if self.code is not OK:
-            return self.error, self.code, {}
+            return self.error or self.response, self.code
         api_response = api_map[self.method](
-            self.arguments, self.store, is_admin=self.is_admin)
+            self.arguments, self.ctx, self.store, is_admin=self.is_admin)
         if api_response.code is not OK:
-            return api_response.error, api_response.code, {}
+            return api_response.error, api_response.code
         return api_response.result
 
 
 def check_auth(request):
+    auth_fields = (request.account, request.login, request.token)
+    if not all(isinstance(item, (str, unicode)) for item in auth_fields):
+        return False
     if request.is_admin:
         digest = hashlib.sha512(datetime.now().strftime(
             '%Y%m%d%H') + ADMIN_SALT).hexdigest()
@@ -282,7 +290,7 @@ def check_auth(request):
 def method_handler(request, ctx, store):
     # response, code = None,  None
     # return response, code
-    return MethodRequest(request.get('body'), store).result
+    return MethodRequest(request.get('body'), ctx, store).result
 
 
 class MainHTTPHandler(BaseHTTPRequestHandler):
@@ -297,7 +305,6 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         response, code = {}, OK
         context = {'request_id': self.get_request_id(self.headers)}
-        context_ext = {}
         request = None
         try:
             data_string = self.rfile.read(int(self.headers['Content-Length']))
@@ -311,7 +318,7 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
                 self.path, data_string, context['request_id']))
             if path in self.router:
                 try:
-                    response, code, context_ext = self.router[path](
+                    response, code = self.router[path](
                         {'body': request, 'headers': self.headers},
                         context,
                         self.store)
@@ -330,7 +337,6 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
             r = {'error': response or ERRORS.get(code, 'Unknown Error'),
                  'code': code}
         context.update(r)
-        context.update(context_ext)
         logging.info(context)
         self.wfile.write(json.dumps(r))
         return
