@@ -41,6 +41,30 @@ api_map = {}
 
 
 def api(cls):
+    """
+    Decorator for create api-method from python-class.
+
+    Class name must be finished "Request".
+    For example, class "OnlineScoreRequest" -> api-method "online_score".
+
+    Api-class must implemente property "result".
+    "result" return two values: response_data (dict) and response_code (int).
+
+    Api-class maybe implemente method "validate".
+
+    Example use:
+
+    @api
+    class OnlineScoreRequest():
+        ...
+        def validate(self):
+            ...
+
+        @property
+        def result(self):
+            ...
+            return response_data, response_code
+    """
     name = cls.__name__.split('Request')[0]
     name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
     name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
@@ -49,6 +73,10 @@ def api(cls):
 
 
 class Undefined(object):
+    """
+    Type for api-field if field does not exist in json.
+    This field is not None, exactly does not exist.
+    """
     pass
 
 
@@ -123,8 +151,6 @@ class DateField(CharField):
 
     def _validate(self):
         super(DateField, self)._validate()
-        # if re.match(r'^\d{2}\.\d{2}\.\d{4}$', self.value) is not None:
-        #     raise ValueError('Expected date format: DD.MM.YYYY')
         self.value = datetime.strptime(self.value, '%d.%m.%Y')
 
 
