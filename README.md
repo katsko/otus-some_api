@@ -61,7 +61,7 @@ class MyMethodRequest(object):
 
     def validate(self):
         if self.first_name == 'test':
-            raise ValueError('first_name: Field must not be "test")
+            raise ValueError('first_name: Field must not be "test"')
 ```
 
 API-класс должен содержать поле result, которое содержит два значения: данные ответа и http-код ответа
@@ -136,7 +136,7 @@ OK:
 
 #### Контекст
 
-В словарь контекста прописываться запись "has" ‐ список полей, которые были не пустые для данного запроса
+В словарь контекста прописываться запись "has" ‐ список полей, которые были не пустые для данного запроса.
 
 #### Ответ
 
