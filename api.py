@@ -111,7 +111,6 @@ class Field(object):
 
 
 class CharField(Field):
-
     def _validate(self):
         if not (isinstance(self.value, str) or
                 isinstance(self.value, unicode)):
@@ -119,14 +118,12 @@ class CharField(Field):
 
 
 class ArgumentsField(Field):
-
     def _validate(self):
         if not isinstance(self.value, dict):
             raise TypeError('Expected dict (json)')
 
 
 class EmailField(CharField):
-
     def _validate(self):
         super(EmailField, self)._validate()
         if '@' not in self.value:
@@ -134,7 +131,6 @@ class EmailField(CharField):
 
 
 class PhoneField(Field):
-
     def _validate(self):
         if not (isinstance(self.value, str) or
                 isinstance(self.value, unicode) or
@@ -148,14 +144,12 @@ class PhoneField(Field):
 
 
 class DateField(CharField):
-
     def _validate(self):
         super(DateField, self)._validate()
         self.value = datetime.strptime(self.value, '%d.%m.%Y')
 
 
 class BirthDayField(DateField):
-
     def _validate(self):
         super(BirthDayField, self)._validate()
         current_date = datetime.now()
@@ -165,14 +159,12 @@ class BirthDayField(DateField):
 
 
 class GenderField(Field):
-
     def _validate(self):
         if self.value not in (0, 1, 2):
             raise ValueError('Expected value 0, 1 or 2')
 
 
 class ClientIDsField(Field):
-
     def _validate(self):
         if not (isinstance(self.value, list) and
                 all(isinstance(item, int) for item in self.value)):
@@ -182,7 +174,6 @@ class ClientIDsField(Field):
 
 
 class MethodNameField(CharField):
-
     def _validate(self):
         super(MethodNameField, self)._validate()
         if self.value not in api_map:
@@ -190,7 +181,6 @@ class MethodNameField(CharField):
 
 
 class MetaBaseMethodRequest(type):
-
     def __new__(self, name, bases, namespace):
         cls = super(MetaBaseMethodRequest, self).__new__(
             self, name, bases, namespace)
@@ -314,8 +304,6 @@ def check_auth(request):
 
 
 def method_handler(request, ctx, store):
-    # response, code = None,  None
-    # return response, code
     return MethodRequest(request.get('body'), ctx, store).result
 
 
